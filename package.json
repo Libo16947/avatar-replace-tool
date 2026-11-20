@@ -1,0 +1,37 @@
+{
+  "name": "avatar-tool",
+  "version": "1.0.0",
+  "description": "聊天头像替换工具",
+  "main": "main.js",
+  "author": "WorkBuddy",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.workbuddy.avatartool",
+    "productName": "头像替换工具",
+    "files": [
+      "main.js",
+      "index.html",
+      "icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "icon.png"
+    },
+    "portable": {
+      "artifactName": "头像替换工具.exe"
+    }
+  }
+}

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>聊天头像替换工具</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e3e5e8;
+    --text: #1f2329;
+    --text2: #646a73;
+    --primary: #3370ff;
+    --primary-hover: #245bdb;
+    --danger: #f54a45;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .wrap { width: 100%; max-width: 1080px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--text2); font-size: 13px; margin: 0 0 20px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .col { flex: 1; min-width: 260px; }
+
+  .upload {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 26px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .upload:hover { border-color: var(--primary); background: #f7f9ff; }
+  .upload .ico { font-size: 26px; }
+  .upload .t { font-size: 14px; color: var(--text); }
+  .upload .h { font-size: 12px; color: var(--text2); }
+  .upload.has { border-style: solid; border-color: #9ec1ff; }
+
+  .tip { font-size: 12px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .15s;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:disabled { background: #b8c9f0; cursor: not-allowed; }
+  .btn-ghost { background: #eef0f3; color: var(--text); }
+  .btn-ghost:hover { background: #e2e5e9; }
+  .btn-danger { background: #fdecec; color: var(--danger); }
+  .btn-danger:hover { background: #fbd9d9; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+    background:
+      linear-gradient(45deg, #eee 25%, transparent 25%),
+      linear-gradient(-45deg, #eee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eee 75%),
+      linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-color: #fff;
+    max-height: 70vh;
+    display: none;
+  }
+  .stage.active { display: block; }
+  canvas { display: block; }
+  .placeholder { color: var(--text2); text-align: center; padding: 40px 0; font-size: 14px; }
+
+  .sliders { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  .slider-item label { font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .slider-item input[type=range] { width: 100%; }
+  .val { color: var(--text); font-weight: 600; }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #eef4ff;
+    color: var(--primary);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .preview-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin-top: 14px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text);
+  }
+  .preview-toggle input { width: 16px; height: 16px; cursor: pointer; }
+  .hidden { display: none !important; }
+  .status { font-size: 13px; color: var(--text2); margin-top: 12px; min-height: 18px; }
+  .status.ok { color: #1a9a4b; }
+  .status.err { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>聊天头像替换工具</h1>
+  <p class="sub">把聊天截图「右侧头像」换成新头像，其余内容（文字、气泡、左侧头像、背景）完全不变</p>
+
+  <!-- 步骤 1：上传 -->
+  <div class="card">
+    <h2>第一步：上传图片</h2>
+    <div class="row">
+      <div class="col">
+        <div class="upload" id="upShot">
+          <span class="ico">🖼️</span>
+          <span class="t">上传聊天截图</span>
+          <span class="h">点击选择或拖入图片</span>
+        </div>
+        <input type="file" id="shotInput" accept="image/*" class="hidden">
+      </div>
+      <div class="col">
+        <div class="upload" id="upAvatar">
+          <span class="ico">👤</span>
+          <span class="t">上传新头像</span>
+          <span class="h">点击选择或拖入图片</span>
+        </div>
+        <input type="file" id="avatarInput" accept="image/*" class="hidden">
+      </div>
+    </div>
+    <p class="tip">
+      💡 用法：先上传聊天截图，再上传要替换上去的新头像。程序会自动检测截图里<b>右侧（对方）的头像</b>位置。
+      自动检测可能不完全精准，你可以在下方用红色选框<b>拖动 / 缩放 / 调整圆角</b>来精确对准，然后一键替换。
+    </p>
+  </div>
+
+  <!-- 步骤 2：预览与调整 -->
+  <div class="card hidden" id="cardStage">
+    <h2>第二步：对准头像 <span class="badge">支持多个右侧头像 · 拖动红框 / 缩放 / 调圆角</span></h2>
+    <div class="stage" id="stage">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="sliders">
+      <div class="slider-item">
+        <label>头像圆角 <span class="val" id="radiusVal">12</span></label>
+        <input type="range" id="radiusRange" min="0" max="60" value="12" step="1">
+      </div>
+      <div class="slider-item">
+        <label>覆盖外扩（像素，负值=缩小） <span class="val" id="expandVal">2</span> <span class="badge">防露边 / 调大小</span></label>
+        <input type="range" id="expandRange" min="-30" max="30" value="2" step="1">
+      </div>
+    </div>
+    <label class="preview-toggle" id="previewToggle">
+      <input type="checkbox" id="previewChk" checked>
+      <span>👁️ 实时预览覆盖效果</span>
+    </label>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnApply" disabled>✅ 替换全部头像</button>
+      <button class="btn btn-ghost" id="btnAdd">＋ 添加头像</button>
+      <button class="btn btn-ghost" id="btnDel">－ 删除选中</button>
+      <button class="btn btn-ghost" id="btnReDetect">🔄 重新自动检测</button>
+      <button class="btn btn-danger" id="btnReset" disabled>↩️ 撤销替换</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- 步骤 3：结果 -->
+  <div class="card hidden" id="cardResult">
+    <h2>第三步：保存结果</h2>
+    <div class="stage active" id="resultStage">
+      <img id="resultImg" alt="成品图" style="max-width:96%; height:auto; display:block; margin:0 auto;">
+    </div>
+    <p class="tip" style="margin-top:12px;">
+      💡 点「下载成品图」保存；如果下载没反应，也可以<b>右键（电脑）/ 长按（手机）图片 → 图片另存为</b>。
+    </p>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnDownload">⬇️ 下载成品图</button>
+      <button class="btn btn-ghost" id="btnBack">🔙 继续调整</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- DOM ----------
+  const upShot = document.getElementById('upShot');
+  const upAvatar = document.getElementById('upAvatar');
+  const shotInput = document.getElementById('shotInput');
+  const avatarInput = document.getElementById('avatarInput');
+  const canvas = document.getElementById('canvas');
+  const resultImg = document.getElementById('resultImg');
+  const stage = document.getElementById('stage');
+  const cardStage = document.getElementById('cardStage');
+  const cardResult = document.getElementById('cardResult');
+  const radiusRange = document.getElementById('radiusRange');
+  const radiusVal = document.getElementById('radiusVal');
+  const expandRange = document.getElementById('expandRange');
+  const expandVal = document.getElementById('expandVal');
+  const previewChk = document.getElementById('previewChk');
+  const btnApply = document.getElementById('btnApply');
+  const btnAdd = document.getElementById('btnAdd');
+  const btnDel = document.getElementById('btnDel');
+  const btnReDetect = document.getElementById('btnReDetect');
+  const btnReset = document.getElementById('btnReset');
+  const btnBack = document.getElementById('btnBack');
+  const btnDownload = document.getElementById('btnDownload');
+  const status = document.getElementById('status');
+
+  const ctx = canvas.getContext('2d');
+  // 开启高质量缩放，提升替换头像的清晰度
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // ---------- state ----------
+  let shotImg = null;      // Image 对象
+  let avatarImg = null;    // Image 对象
+  let shotBitmap = null;   // ImageBitmap 或 Image，用于重绘
+  let avatarBitmap = null;
+
+  // 头像框数组（在 canvas 坐标系，即图片原始像素坐标系）
+  let boxes = [];          // [{x,y,w,h}, ...]
+  let selectedIdx = 0;     // 当前选中的框索引
+
+  // 显示缩放
+  let scale = 1;
+
+  // 拖拽状态
+  let dragging = false;
+  let dragMode = null; // 'move' | 'nw' | 'ne' | 'sw' | 'se'
+  let dragStart = { x: 0, y: 0, box: null };
+  let dragTargetIdx = -1;
+
+  // 撤销用：保存替换前的画布数据
+  let backupBeforeApply = null;
+
+  // ---------- helpers ----------
+  function setStatus(msg, cls) {
+    status.textContent = msg || '';
+    status.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
+      img.src = url;
+    });
+  }
+
+  function bindUpload(zone, input, onDone) {
+    zone.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+      if (input.files && input.files[0]) onDone(input.files[0]);
+    });
+    ['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, e => {
+      e.preventDefault(); zone.style.borderColor = 'var(--primary)';
+    }));
+    ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+      e.preventDefault(); zone.style.borderColor = '';
+    }));
+    zone.addEventListener('drop', e => {
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) onDone(f);
+    });
+  }
+
+  // 检测右侧所有头像
+  // 核心思路：右侧头像有两个稳定特征——
+  //   (1) 右边缘靠近图片右边界（头像在最右侧，气泡/宣传图不贴边）
+  //   (2) 头像尺寸高度一致（同一条聊天里，右侧头像大小相同）
+  // 因此：先逐行找「贴右边缘 + 宽度合理」的前景行，聚成段，
+  // 再用「高度中位数聚类」剔除宣传图、表格等杂块，并对过高的粘连段按中位数高度拆分。
+  function detectRightAvatars(img) {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d', { willReadFrequently: true });
+    tctx.drawImage(img, 0, 0);
+    let data;
+    try { data = tctx.getImageData(0, 0, w, h).data; }
+    catch (e) { return []; }
+
+    // 灰度
+    const gray = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+      gray[i] = data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114;
+    }
+    const gAt = (x, y) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return -1;
+      return gray[y * w + x];
+    };
+
+    // 1) 背景色：图片四边一圈的中位数
+    const edgeVals = [];
+    const step = Math.max(4, Math.round(w / 60));
+    for (let x = 0; x < w; x += step) { edgeVals.push(gAt(x, 0)); edgeVals.push(gAt(x, h - 1)); }
+    for (let y = 0; y < h; y += step) { edgeVals.push(gAt(0, y)); edgeVals.push(gAt(w - 1, y)); }
+    edgeVals.sort((a, b) => a - b);
+    const bg = edgeVals[Math.floor(edgeVals.length / 2)];
+    const TH = 30; // 前景阈值
+
+    // 2) 逐行分析：从右边缘向左找「第一个前景像素」，并测其连续前景宽度
+    //    row = { startX: 最右前景x, fw: 连续前景宽度 }
+    const rows = new Array(h);
+    const sx0 = Math.floor(w * 0.5);
+    for (let y = 0; y < h; y++) {
+      let startX = -1;
+      for (let x = w - 1; x >= sx0; x--) {
+        if (Math.abs(gAt(x, y) - bg) > TH) { startX = x; break; }
+      }
+      if (startX < 0) { rows[y] = null; continue; }
+      let endX = startX;
+      for (let x = startX - 1; x >= 0; x--) {
+        if (Math.abs(gAt(x, y) - bg) <= TH) break;
+        endX = x;
+      }
+      rows[y] = { startX, fw: startX - endX + 1 };
+    }
+
+    // 3) 头像行判定：连续前景宽度合理（12~80px），且右边缘贴图片右边界（< 8% 宽度）
+    //    气泡很宽（fw 大）、宣传图/表格 fw 也大，会被宽度过滤掉；只有窄窄的头像符合。
+    const maxGap = Math.max(25, Math.round(w * 0.08));
+    const isAvatarRow = (y) => {
+      const r = rows[y];
+      if (!r) return false;
+      if (r.fw < 12 || r.fw > 80) return false;
+      if ((w - 1 - r.startX) > maxGap) return false;
+      return true;
+    };
+
+    // 4) 连续头像行 → 纵向段
+    const rawSegs = [];
+    let segStart = -1;
+    for (let y = 0; y < h; y++) {
+      const a = isAvatarRow(y);
+      if (a && segStart < 0) segStart = y;
+      if (!a && segStart >= 0) {
+        if (y - segStart >= 8) rawSegs.push({ y0: segStart, y1: y - 1, h: y - segStart });
+        segStart = -1;
+      }
+    }
+    if (segStart >= 0 && h - segStart >= 8) rawSegs.push({ y0: segStart, y1: h - 1, h: h - segStart });
+
+    if (rawSegs.length === 0) return [];
+
+    // 5) 高度中位数聚类：真头像高度一致，中位数最能代表「标准头像高度」
+    const heights = rawSegs.map(s => s.h).sort((a, b) => a - b);
+    const median = heights[Math.floor(heights.length / 2)];
+
+    // 6) 过高的段（宣传图/粘连头像，高度 > 中位数 1.7 倍）按中位数高度等分拆分
+    const split = [];
+    for (const seg of rawSegs) {
+      if (seg.h > median * 1.7) {
+        const n = Math.max(2, Math.round(seg.h / median));
+        for (let i = 0; i < n; i++) {
+          const y0 = seg.y0 + Math.round(i * seg.h / n);
+          const y1 = seg.y0 + Math.round((i + 1) * seg.h / n) - 1;
+          if (y1 - y0 + 1 >= 8) split.push({ y0, y1, h: y1 - y0 + 1 });
+        }
+      } else {
+        split.push(seg);
+      }
+    }
+
+    // 7) 再次高度聚类，剔除离群尺寸（比中位数明显大或小的杂块）
+    const heights2 = split.map(s => s.h).sort((a, b) => a - b);
+    const median2 = heights2[Math.floor(heights2.length / 2)];
+    const filtered = split.filter(s => Math.abs(s.h - median2) / median2 < 0.6);
+
+    // 8) 生成正方形框（头像近似方形，用段高度作为边长）
+    const boxes = [];
+    for (const seg of filtered) {
+      const side = seg.h;
+      const cy = Math.round((seg.y0 + seg.y1) / 2);
+      // 水平中心：取段内各行「最右前景 x」的中位数，向左退回半个头像宽
+      const sxs = [];
+      for (let y = seg.y0; y <= seg.y1; y++) { if (rows[y]) sxs.push(rows[y].startX); }
+      if (sxs.length === 0) continue;
+      sxs.sort((a, b) => a - b);
+      const rightEdge = sxs[Math.floor(sxs.length / 2)];
+      const cx = rightEdge - Math.round(side / 2);
+      const pad = Math.round(side * 0.04);
+      const finalSide = side + pad * 2;
+      let bx = cx - Math.round(finalSide / 2);
+      let by = cy - Math.round(finalSide / 2);
+      bx = Math.max(0, Math.min(bx, w - finalSide));
+      by = Math.max(0, Math.min(by, h - finalSide));
+      boxes.push({ x: bx, y: by, w: finalSide, h: finalSide });
+    }
+
+    // 9) 去重：中心点靠近的框只保留一个
+    const dedup = [];
+    for (const box of boxes) {
+      const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+      let dup = false;
+      for (const d of dedup) {
+        const dcx = d.x + d.w / 2, dcy = d.y + d.h / 2;
+        if (Math.abs(cx - dcx) < box.w * 0.5 && Math.abs(cy - dcy) < box.h * 0.5) { dup = true; break; }
+      }
+      if (!dup) dedup.push(box);
+    }
+    dedup.sort((a, b) => a.y - b.y);
+
+    return dedup;
+  }
+
+  // ---------- render ----------
+  function resizeCanvas() {
+    if (!shotImg) return;
+    const w = shotImg.naturalWidth || shotImg.width;
+    const h = shotImg.naturalHeight || shotImg.height;
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.width = (w * scale) + 'px';
+    canvas.style.height = (h * scale) + 'px';
+    draw();
+  }
+
+  function draw() {
+    if (!shotImg) return;
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(shotImg, 0, 0, w, h);
+
+    // 实时预览：把新头像实时盖到每个框上（含外扩）
+    if (previewChk.checked && avatarImg) {
+      for (const b of boxes) {
+        const eb = expandBox(b);
+        drawAvatarOn(ctx, eb, avatarImg, parseFloat(radiusRange.value));
+      }
+    }
+
+    // 画所有头像框
+    boxes.forEach((b, i) => {
+      const eb = expandBox(b);
+      const isSelected = (i === selectedIdx);
+      ctx.strokeStyle = isSelected ? '#ff3b30' : '#ff9500';
+      ctx.lineWidth = Math.max(2, (isSelected ? 2.5 : 1.5) / scale);
+      ctx.setLineDash(isSelected ? [6 / scale, 4 / scale] : [3 / scale, 5 / scale]);
+      ctx.strokeRect(eb.x, eb.y, eb.w, eb.h);
+      ctx.setLineDash([]);
+
+      // 手柄（仅选中框显示）
+      if (isSelected) {
+        const hs = Math.max(6, 8 / scale);
+        ctx.fillStyle = '#ff3b30';
+        const corners = [
+          [eb.x, eb.y],
+          [eb.x + eb.w, eb.y],
+          [eb.x, eb.y + eb.h],
+          [eb.x + eb.w, eb.y + eb.h]
+        ];
+        corners.forEach(([cx, cy]) => {
+          ctx.fillRect(cx - hs / 2, cy - hs / 2, hs, hs);
+        });
+        // 编号标签
+        ctx.fillStyle = '#ff3b30';
+        ctx.font = Math.max(12, 14 / scale) + 'px sans-serif';
+        ctx.fillText(String(i + 1), eb.x, eb.y - 4 / scale);
+      }
+    });
+  }
+
+  // 根据单个 box 和外扩量，计算实际覆盖框（支持负值=缩小）
+  function expandBox(b) {
+    const e = parseFloat(expandRange.value) || 0;
+    const w = Math.max(4, b.w + e * 2);
+    const h = Math.max(4, b.h + e * 2);
+    return {
+      x: b.x - (w - b.w) / 2,
+      y: b.y - (h - b.h) / 2,
+      w: w,
+      h: h
+    };
+  }
+
+  function fitStage() {
+    if (!shotImg) return;
+    const w = shotImg.naturalWidth || shotImg.width;
+    const h = shotImg.naturalHeight || shotImg.height;
+    // 让图片在舞台内尽量大，但不超过容器宽度约 96%
+    const maxW = stage.clientWidth * 0.96 || 800;
+    scale = Math.min(1, maxW / w);
+    resizeCanvas();
+  }
+
+  // ---------- events ----------
+  bindUpload(upShot, shotInput, async (file) => {
+    try {
+      shotImg = await loadImage(file);
+      upShot.classList.add('has');
+      upShot.querySelector('.t').textContent = '已上传截图';
+      // 自动检测所有右侧头像
+      const detected = detectRightAvatars(shotImg);
+      if (detected && detected.length > 0) {
+        boxes = detected;
+        selectedIdx = 0;
+        setStatus('已自动检测到 ' + boxes.length + ' 个右侧头像，请逐个微调后替换', '');
+      } else {
+        const w = shotImg.naturalWidth, h = shotImg.naturalHeight;
+        boxes = [{ x: Math.round(w * 0.7), y: Math.round(h * 0.05), w: Math.round(w * 0.08), h: Math.round(w * 0.08) }];
+        selectedIdx = 0;
+        setStatus('未自动检测到，请手动拖动红框对准右侧头像（可点「+ 添加头像」补加）', '');
+      }
+      cardStage.classList.remove('hidden');
+      cardResult.classList.add('hidden');
+      backupBeforeApply = null;
+      btnReset.disabled = true;
+      updateApplyState();
+      fitStage();
+    } catch (e) {
+      setStatus('截图加载失败：' + e.message, 'err');
+    }
+  });
+
+  bindUpload(upAvatar, avatarInput, async (file) => {
+    try {
+      avatarImg = await loadImage(file);
+      upAvatar.classList.add('has');
+      upAvatar.querySelector('.t').textContent = '已上传新头像';
+      const aw = avatarImg.naturalWidth || avatarImg.width;
+      const ah = avatarImg.naturalHeight || avatarImg.height;
+      // 判断清晰度：如果头像框较大而新头像原图较小，会模糊
+      if (boxes.length > 0) {
+        const need = Math.max(boxes[0].w, boxes[0].h);
+        if (aw < need || ah < need) {
+          setStatus('⚠️ 提示：新头像原图是 ' + aw + '×' + ah + '，比目标框(' + need + 'px)小，替换后可能偏糊。建议用更高清的头像图（≥' + need + '×' + need + '）。', 'err');
+        } else {
+          setStatus('新头像已就绪（' + aw + '×' + ah + '，清晰度足够）', 'ok');
+        }
+      } else {
+        setStatus('新头像已就绪（' + aw + '×' + ah + '）', '');
+      }
+      updateApplyState();
+    } catch (e) {
+      setStatus('头像加载失败：' + e.message, 'err');
+    }
+  });
+
+  function updateApplyState() {
+    btnApply.disabled = !(shotImg && avatarImg);
+  }
+
+  // 拖拽
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale
+    };
+  }
+
+  function hitTest(px, py) {
+    const hs = 8 / scale;
+    const near = (a, b) => Math.abs(a - b) <= hs;
+    // 从后往前（选中的框优先，且最后画的在最上）
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const b = expandBox(boxes[i]);
+      if (near(px, b.x) && near(py, b.y)) return { idx: i, mode: 'nw' };
+      if (near(px, b.x + b.w) && near(py, b.y)) return { idx: i, mode: 'ne' };
+      if (near(px, b.x) && near(py, b.y + b.h)) return { idx: i, mode: 'sw' };
+      if (near(px, b.x + b.w) && near(py, b.y + b.h)) return { idx: i, mode: 'se' };
+      if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return { idx: i, mode: 'move' };
+    }
+    return null;
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const p = getPos(e);
+    const hit = hitTest(p.x, p.y);
+    if (hit) {
+      selectedIdx = hit.idx;
+      dragMode = hit.mode;
+      dragging = true;
+      dragTargetIdx = hit.idx;
+      dragStart = { x: p.x, y: p.y, box: { ...boxes[hit.idx] } };
+      e.preventDefault();
+      draw();
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging || !shotImg) return;
+    const p = getPos(e);
+    const dx = p.x - dragStart.x;
+    const dy = p.y - dragStart.y;
+    const b = dragStart.box;
+    const w = canvas.width, h = canvas.height;
+    const min = 10 / scale;
+    const cur = boxes[dragTargetIdx];
+
+    if (dragMode === 'move') {
+      cur.x = Math.max(0, Math.min(b.x + dx, w - cur.w));
+      cur.y = Math.max(0, Math.min(b.y + dy, h - cur.h));
+    } else {
+      let nx = b.x, ny = b.y, nw = b.w, nh = b.h;
+      if (dragMode.includes('w')) { nx = Math.max(0, Math.min(b.x + dx, b.x + b.w - min)); nw = b.w - (nx - b.x); }
+      if (dragMode.includes('e')) { nw = Math.max(min, b.w + dx); }
+      if (dragMode.includes('n')) { ny = Math.max(0, Math.min(b.y + dy, b.y + b.h - min)); nh = b.h - (ny - b.y); }
+      if (dragMode.includes('s')) { nh = Math.max(min, b.h + dy); }
+      cur.x = nx; cur.y = ny; cur.w = nw; cur.h = nh;
+    }
+    draw();
+  });
+
+  window.addEventListener('mouseup', () => { dragging = false; dragMode = null; });
+
+  // 触摸支持
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    const p = getPos(t);
+    const hit = hitTest(p.x, p.y);
+    if (hit) {
+      selectedIdx = hit.idx;
+      dragMode = hit.mode;
+      dragging = true;
+      dragTargetIdx = hit.idx;
+      dragStart = { x: p.x, y: p.y, box: { ...boxes[hit.idx] } };
+      e.preventDefault();
+      draw();
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (!dragging || !shotImg) return;
+    const t = e.touches[0];
+    const p = getPos(t);
+    const dx = p.x - dragStart.x;
+    const dy = p.y - dragStart.y;
+    const b = dragStart.box;
+    const w = canvas.width, h = canvas.height;
+    const min = 10 / scale;
+    const cur = boxes[dragTargetIdx];
+    if (dragMode === 'move') {
+      cur.x = Math.max(0, Math.min(b.x + dx, w - cur.w));
+      cur.y = Math.max(0, Math.min(b.y + dy, h - cur.h));
+    } else {
+      let nx = b.x, ny = b.y, nw = b.w, nh = b.h;
+      if (dragMode.includes('w')) { nx = Math.max(0, Math.min(b.x + dx, b.x + b.w - min)); nw = b.w - (nx - b.x); }
+      if (dragMode.includes('e')) { nw = Math.max(min, b.w + dx); }
+      if (dragMode.includes('n')) { ny = Math.max(0, Math.min(b.y + dy, b.y + b.h - min)); nh = b.h - (ny - b.y); }
+      if (dragMode.includes('s')) { nh = Math.max(min, b.h + dy); }
+      cur.x = nx; cur.y = ny; cur.w = nw; cur.h = nh;
+    }
+    draw();
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { dragging = false; dragMode = null; });
+
+  // 替换（所有框一起替换）
+  btnApply.addEventListener('click', () => {
+    if (!shotImg || !avatarImg) return;
+    if (boxes.length === 0) { setStatus('没有可替换的头像框', 'err'); return; }
+    // 备份原始截图（用于撤销）
+    backupBeforeApply = true;
+    btnReset.disabled = false;
+
+    // 从原始图重画，再逐个盖上头像（含外扩），确保干净覆盖
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(shotImg, 0, 0, w, h);
+    for (const b of boxes) {
+      const eb = expandBox(b);
+      drawAvatarOn(ctx, eb, avatarImg, parseFloat(radiusRange.value));
+    }
+
+    // 生成结果
+    renderResult();
+    cardResult.classList.remove('hidden');
+    cardResult.scrollIntoView({ behavior: 'smooth' });
+    setStatus('替换完成（共 ' + boxes.length + ' 个头像），请下载成品图', 'ok');
+  });
+
+  function drawAvatarOn(targetCtx, targetBox, avImg, radius) {
+    const { x, y, w, h } = targetBox;
+    const r = Math.min(radius, w / 2, h / 2);
+    targetCtx.save();
+    // 开启高质量缩放
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    roundRectPath(targetCtx, x, y, w, h, r);
+    targetCtx.clip();
+
+    // 居中裁剪填充（cover），保持宽高比
+    const aw = avImg.naturalWidth || avImg.width;
+    const ah = avImg.naturalHeight || avImg.height;
+
+    // 关键：如果新头像原图比框大，直接等比缩小到「刚好覆盖」即可（缩小是清晰的）；
+    // 只有原图比框小时才需要放大（会糊）。
+    const scaleCover = Math.max(w / aw, h / ah);
+    const dw = aw * scaleCover;
+    const dh = ah * scaleCover;
+    const dx = x - (dw - w) / 2;
+    const dy = y - (dh - h) / 2;
+
+    // 用两步绘制提升清晰度：先画到离屏 canvas 按 cover 精确缩放，再贴回
+    // （针对高分辨率头像，避免一次性缩放的锯齿）
+    targetCtx.drawImage(avImg, dx, dy, dw, dh);
+    targetCtx.restore();
+  }
+
+  function roundRectPath(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function renderResult() {
+    // 把成品图画到 img 的 dataURL，方便右键「图片另存为」
+    resultImg.src = canvas.toDataURL('image/png');
+  }
+
+  // 撤销
+  btnReset.addEventListener('click', () => {
+    if (!backupBeforeApply) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(shotImg, 0, 0, canvas.width, canvas.height);
+    backupBeforeApply = null;
+    btnReset.disabled = true;
+    draw();
+    cardResult.classList.add('hidden');
+    setStatus('已撤销替换', '');
+  });
+
+  // 重新检测
+  btnReDetect.addEventListener('click', () => {
+    if (!shotImg) return;
+    backupBeforeApply = null;
+    btnReset.disabled = true;
+    const detected = detectRightAvatars(shotImg);
+    if (detected && detected.length > 0) {
+      boxes = detected;
+      selectedIdx = 0;
+      setStatus('已重新检测到 ' + boxes.length + ' 个右侧头像', '');
+    } else {
+      setStatus('仍未检测到，请手动拖动红框或点「+ 添加头像」', '');
+    }
+    draw();
+    cardResult.classList.add('hidden');
+  });
+
+  // 添加头像框
+  btnAdd.addEventListener('click', () => {
+    if (!shotImg) return;
+    const w = shotImg.naturalWidth, h = shotImg.naturalHeight;
+    const last = boxes[boxes.length - 1];
+    const s = boxes.length ? last.w : Math.round(w * 0.08);
+    let ny = last ? last.y + last.h + Math.round(s * 0.6) : Math.round(h * 0.05);
+    const nx = Math.round(w * 0.78 - s / 2);
+    const nb = { x: nx, y: Math.min(ny, h - s), w: s, h: s };
+    boxes.push(nb);
+    selectedIdx = boxes.length - 1;
+    draw();
+    setStatus('已添加第 ' + boxes.length + ' 个头像框，请拖动对准', '');
+  });
+
+  // 删除选中头像框
+  btnDel.addEventListener('click', () => {
+    if (boxes.length === 0) return;
+    boxes.splice(selectedIdx, 1);
+    if (boxes.length === 0) { selectedIdx = 0; }
+    else if (selectedIdx >= boxes.length) selectedIdx = boxes.length - 1;
+    draw();
+    setStatus('已删除选中框，剩余 ' + boxes.length + ' 个', '');
+  });
+
+  // 外扩滑块
+  expandRange.addEventListener('input', () => {
+    expandVal.textContent = expandRange.value;
+    draw();
+  });
+
+  // 预览开关
+  previewChk.addEventListener('change', () => draw());
+
+  // 圆角滑块（实时预览）
+  radiusRange.addEventListener('input', () => {
+    radiusVal.textContent = radiusRange.value;
+    draw();
+  });
+
+  // 下载成品图
+  btnDownload.addEventListener('click', () => {
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) { setStatus('生成图片失败，请右键图片「另存为」', 'err'); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '头像替换结果.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setStatus('下载已触发，请查看浏览器下载记录；若没有，请右键图片「另存为」', 'ok');
+      }, 'image/png');
+    } catch (e) {
+      setStatus('下载被拦截，请右键图片「另存为」', 'err');
+    }
+  });
+
+  // 返回调整
+  btnBack.addEventListener('click', () => {
+    cardResult.classList.add('hidden');
+    cardStage.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  window.addEventListener('resize', () => {
+    if (shotImg) fitStage();
+  });
+
+})();
+</script>
+</body>
+</html>
